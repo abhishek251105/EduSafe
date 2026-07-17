@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Teacher Dashboard - EduSafe</title>
+    <link rel="stylesheet" href="teacher.css" />
+  </head>
+  <body>
+    <div class="nav">
+      <h1>Teacher Dashboard</h1>
+      <div class="right">
+        <span id="welcomeName"></span>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="grid">
+        <div class="card">
+          <h2>Create Module</h2>
+          <label for="moduleTitle">Title</label>
+          <input id="moduleTitle" type="text" placeholder="Disaster basics" />
+          <label for="moduleDescription">Description</label>
+          <textarea
+            id="moduleDescription"
+            placeholder="Overview of disaster preparedness for students..."
+          ></textarea>
+          <button id="createModuleBtn">Create Module</button>
+          <div id="moduleStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <h2>My Modules</h2>
+          <div id="myModules"></div>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top: 1.5rem">
+        <div class="card">
+          <h2>Create Quiz</h2>
+          <div class="small">
+            Enter questions as JSON array. Example:
+            <pre>[
+  {
+    "questionText": "What is an earthquake drill?",
+    "options": ["Practice", "Real event"],
+    "correctOptionIndex": 0,
+    "marks": 1
+  }
+]</pre>
+          </div>
+          <label for="quizTitle">Title</label>
+          <input id="quizTitle" type="text" placeholder="Earthquake Safety Quiz" />
+          <label for="quizModuleId">Module ID (optional)</label>
+          <input
+            id="quizModuleId"
+            type="text"
+            placeholder="Paste a Module _id to link the quiz"
+          />
+          <label for="quizQuestions">Questions JSON</label>
+          <textarea id="quizQuestions" placeholder="[]"></textarea>
+          <button id="createQuizBtn">Create Quiz</button>
+          <div id="quizStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <h2>My Quizzes</h2>
+          <div id="myQuizzes"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function guard() {
+        const token = localStorage.getItem("token");
+        const role = localStorage.getItem("role");
+        if (!token || role !== "teacher") {
+          window.location.href = "login.html";
+        }
+      })();
+
+      const API_BASE = "http://localhost:5000";
+
+      function logout() {
+        localStorage.clear();
+        window.location.href = "login.html";
+      }
+
+      document.getElementById("welcomeName").textContent =
+        (localStorage.getItem("name") || "Teacher") + " \u00b7 teacher";
+
+      async function fetchJSON(url, options) {
+        const token = localStorage.getItem("token");
+        const res = await fetch(url, {
+          ...(options || {}),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            ...(options && options.headers)
+          }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = data && data.message ? data.message : "Request failed";
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      // Modules
+      async function loadMyModules() {
+        try {
+          const modules = await fetchJSON(API_BASE + "/api/teacher/modules");
+          const container = document.getElementById("myModules");
+          container.innerHTML = "";
+          if (!modules.length) {
+            container.textContent = "No modules created yet.";
+            return;
+          }
+          modules.forEach((m) => {
+            const div = document.createElement("div");
+            div.className = "item";
+            div.innerHTML =
+              '<div class="item-title">' +
+              m.title +
+              '</div><div class="item-meta">ID: ' +
+              m._id +
+              "</div><div>" +
+              (m.description || "") +
+              "</div>";
+            container.appendChild(div);
+          });
+        } catch (e) {
+          document.getElementById("myModules").textContent =
+            "Error loading modules: " + e.message;
+        }
+      }
+
+      document
+        .getElementById("createModuleBtn")
+        .addEventListener("click", async () => {
+          const title = document.getElementById("moduleTitle").value.trim();
+          const description = document
+            .getElementById("moduleDescription")
+            .value.trim();
+          const statusEl = document.getElementById("moduleStatus");
+          statusEl.textContent = "";
+
+          if (!title) {
+            statusEl.textContent = "Title is required.";
+            return;
+          }
+
+          try {
+            await fetchJSON(API_BASE + "/api/teacher/modules", {
+              method: "POST",
+              body: JSON.stringify({ title, description })
+            });
+            statusEl.textContent = "Module created.";
+            document.getElementById("moduleTitle").value = "";
+            document.getElementById("moduleDescription").value = "";
+            loadMyModules();
+          } catch (e) {
+            statusEl.textContent = "Error: " + e.message;
+          }
+        });
+
+      // Quizzes
+      async function loadMyQuizzes() {
+        try {
+          const quizzes = await fetchJSON(API_BASE + "/api/teacher/quizzes");
+          const container = document.getElementById("myQuizzes");
+          container.innerHTML = "";
+          if (!quizzes.length) {
+            container.textContent = "No quizzes created yet.";
+            return;
+          }
+          quizzes.forEach((q) => {
+            const div = document.createElement("div");
+            div.className = "item";
+            const moduleTitle =
+              q.module && q.module.title ? q.module.title : "None";
+
+            div.innerHTML =
+              '<div class="item-title">' +
+              q.title +
+              '</div><div class="item-meta">Quiz ID: ' +
+              q._id +
+              '</div><div class="item-meta">Module: ' +
+              moduleTitle +
+              '</div><div class="item-meta">Questions: ' +
+              (q.questions ? q.questions.length : 0) +
+              "</div>";
+
+            const attemptsBtn = document.createElement("button");
+            attemptsBtn.className = "secondary";
+            attemptsBtn.textContent = "View Attempts";
+
+            const attemptsDiv = document.createElement("div");
+            attemptsDiv.className = "attempts";
+
+            attemptsBtn.addEventListener("click", async () => {
+              if (attemptsDiv.getAttribute("data-loaded") === "true") {
+                attemptsDiv.textContent = "";
+                attemptsDiv.setAttribute("data-loaded", "false");
+                return;
+              }
+              attemptsDiv.textContent = "Loading attempts...";
+              try {
+                const attempts = await fetchJSON(
+                  API_BASE + "/api/teacher/quizzes/" + q._id + "/attempts"
+                );
+                attemptsDiv.innerHTML = "";
+                if (!attempts.length) {
+                  attemptsDiv.textContent = "No attempts yet.";
+                } else {
+                  attempts.forEach((a) => {
+                    const aDiv = document.createElement("div");
+                    const student =
+                      a.student && (a.student.name || a.student.email)
+                        ? a.student.name + " (" + a.student.email + ")"
+                        : "Student";
+                    const date = new Date(a.createdAt).toLocaleString();
+                    aDiv.innerHTML =
+                      "<div><strong>" +
+                      student +
+                      "</strong></div><div>Score: " +
+                      a.score +
+                      "</div><div>" +
+                      date +
+                      "</div>";
+                    attemptsDiv.appendChild(aDiv);
+                  });
+                }
+                attemptsDiv.setAttribute("data-loaded", "true");
+              } catch (e) {
+                attemptsDiv.textContent = "Error loading attempts: " + e.message;
+              }
+            });
+
+            div.appendChild(attemptsBtn);
+            div.appendChild(attemptsDiv);
+            container.appendChild(div);
+          });
+        } catch (e) {
+          document.getElementById("myQuizzes").textContent =
+            "Error loading quizzes: " + e.message;
+        }
+      }
+
+      document
+        .getElementById("createQuizBtn")
+        .addEventListener("click", async () => {
+          const title = document.getElementById("quizTitle").value.trim();
+          const moduleId = document.getElementById("quizModuleId").value.trim();
+          const questionsText = document
+            .getElementById("quizQuestions")
+            .value.trim();
+          const statusEl = document.getElementById("quizStatus");
+          statusEl.textContent = "";
+
+          if (!title || !questionsText) {
+            statusEl.textContent = "Title and questions are required.";
+            return;
+          }
+
+          let questions;
+          try {
+            questions = JSON.parse(questionsText);
+          } catch (e) {
+            statusEl.textContent = "Questions must be valid JSON.";
+            return;
+          }
+
+          if (!Array.isArray(questions) || !questions.length) {
+            statusEl.textContent = "Questions JSON must be a non-empty array.";
+            return;
+          }
+
+          try {
+            await fetchJSON(API_BASE + "/api/teacher/quizzes", {
+              method: "POST",
+              body: JSON.stringify({
+                title,
+                moduleId: moduleId || undefined,
+                questions
+              })
+            });
+            statusEl.textContent = "Quiz created.";
+            document.getElementById("quizTitle").value = "";
+            document.getElementById("quizModuleId").value = "";
+            document.getElementById("quizQuestions").value = "";
+            loadMyQuizzes();
+          } catch (e) {
+            statusEl.textContent = "Error: " + e.message;
+          }
+        });
+
+      loadMyModules();
+      loadMyQuizzes();
+    </script>
+  </body>
+  </html>
+
+

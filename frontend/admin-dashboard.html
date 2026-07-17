@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Admin Dashboard - EduSafe</title>
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="nav">
+      <h1>Admin Dashboard</h1>
+      <div class="right">
+        <span id="welcomeName"></span>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="card">
+        <h2>Create Alert</h2>
+        <label for="alertMessage">Message</label>
+        <textarea
+          id="alertMessage"
+          placeholder="Example: Earthquake drill scheduled for Friday 10 AM..."
+        ></textarea>
+
+        <label for="alertSeverity">Severity</label>
+        <select id="alertSeverity">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="critical">Critical</option>
+        </select>
+
+        <button id="createAlertBtn">Create Alert</button>
+        <div id="alertStatus" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>All Alerts</h2>
+        <div id="alertsList"></div>
+      </div>
+    </div>
+
+    <script>
+      (function guard() {
+        const token = localStorage.getItem("token");
+        const role = localStorage.getItem("role");
+        if (!token || role !== "admin") {
+          window.location.href = "login.html";
+        }
+      })();
+
+      const API_BASE = "http://localhost:5000";
+
+      function logout() {
+        localStorage.clear();
+        window.location.href = "login.html";
+      }
+
+      document.getElementById("welcomeName").textContent =
+        (localStorage.getItem("name") || "Admin") + " \u00b7 admin";
+
+      async function fetchJSON(url, options) {
+        const token = localStorage.getItem("token");
+        const res = await fetch(url, {
+          ...(options || {}),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            ...(options && options.headers)
+          }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = data && data.message ? data.message : "Request failed";
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      document
+        .getElementById("createAlertBtn")
+        .addEventListener("click", async () => {
+          const message = document.getElementById("alertMessage").value.trim();
+          const severity = document.getElementById("alertSeverity").value;
+          const statusEl = document.getElementById("alertStatus");
+          statusEl.textContent = "";
+
+          if (!message) {
+            statusEl.textContent = "Message is required.";
+            return;
+          }
+
+          try {
+            await fetchJSON(API_BASE + "/api/admin/alerts", {
+              method: "POST",
+              body: JSON.stringify({ message, severity })
+            });
+            statusEl.textContent = "Alert created.";
+            document.getElementById("alertMessage").value = "";
+            document.getElementById("alertSeverity").value = "info";
+            loadAlerts();
+          } catch (e) {
+            statusEl.textContent = "Error: " + e.message;
+          }
+        });
+
+      async function loadAlerts() {
+        try {
+          const alerts = await fetchJSON(API_BASE + "/api/admin/alerts");
+          const container = document.getElementById("alertsList");
+          container.innerHTML = "";
+          if (!alerts.length) {
+            container.textContent = "No alerts yet.";
+            return;
+          }
+          alerts.forEach((a) => {
+            const div = document.createElement("div");
+            div.className = "item";
+
+            const severityClass =
+              a.severity === "critical"
+                ? "critical"
+                : a.severity === "warning"
+                ? "warning"
+                : "info";
+
+            const creator =
+              a.createdBy && (a.createdBy.name || a.createdBy.email)
+                ? a.createdBy.name + " (" + a.createdBy.email + ")"
+                : "Admin";
+
+            const date = new Date(a.createdAt).toLocaleString();
+
+            div.innerHTML =
+              '<div class="item-title">' +
+              a.message +
+              ' <span class="badge ' +
+              severityClass +
+              '">' +
+              a.severity.toUpperCase() +
+              "</span></div>" +
+              '<div class="item-meta">By ' +
+              creator +
+              " \u00b7 " +
+              date +
+              "</div>" +
+              '<div class="item-meta">Status: ' +
+              (a.active ? "Active" : "Inactive") +
+              "</div>";
+
+            if (a.active) {
+              const btn = document.createElement("button");
+              btn.textContent = "Deactivate";
+              btn.addEventListener("click", async () => {
+                try {
+                  await fetchJSON(
+                    API_BASE + "/api/admin/alerts/" + a._id + "/deactivate",
+                    {
+                      method: "PATCH"
+                    }
+                  );
+                  loadAlerts();
+                } catch (e) {
+                  alert("Error deactivating alert: " + e.message);
+                }
+              });
+              div.appendChild(btn);
+            }
+
+            container.appendChild(div);
+          });
+        } catch (e) {
+          document.getElementById("alertsList").textContent =
+            "Error loading alerts: " + e.message;
+        }
+      }
+
+      loadAlerts();
+    </script>
+  </body>
+  </html>
+
+

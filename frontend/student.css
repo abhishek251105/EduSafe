@@ -1,0 +1,138 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #e8f5e9;
+  color: #1b5e20;
+}
+
+.nav {
+  background-color: #2e7d32;
+  color: #ffffff;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.nav .right {
+  font-size: 0.9rem;
+}
+
+.nav button {
+  margin-left: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  border: none;
+  background-color: #c62828;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.container {
+  padding: 1.5rem;
+  max-width: 2100px;
+  margin: 0 auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-gap: 1.5rem;
+}
+
+.card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+  padding: 1rem 1.25rem;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.item {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0.75rem 0;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.item-title {
+  font-weight: bold;
+}
+
+.item-meta {
+  font-size: 0.85rem;
+  color: #4e784e;
+}
+
+.item button {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  border: none;
+  background-color: #2e7d32;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background-color: #c8e6c9;
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
+.quiz-area {
+  margin-top: 1rem;
+  border-top: 1px dashed #c8e6c9;
+  padding-top: 0.75rem;
+}
+
+.question {
+  margin-bottom: 0.75rem;
+}
+
+.question-title {
+  font-weight: bold;
+}
+
+.question-options label {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.btn-secondary {
+  background-color: #558b2f;
+}
+
+.score-message {
+  margin-top: 0.5rem;
+  font-weight: bold;
+}
+
+.section-title {
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  color: #2e7d32;
+}
+
+.attempts-list {
+  font-size: 0.85rem;
+}
+
+

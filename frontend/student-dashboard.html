@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Student Dashboard - EduSafe</title>
+    <link rel="stylesheet" href="student.css" />
+  </head>
+  <body>
+    <div class="nav">
+      <h1>Student Dashboard</h1>
+      <div class="right">
+        <span id="welcomeName"></span>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="grid">
+        <div class="card">
+          <h2>My Learning Modules</h2>
+          <div id="modulesList"></div>
+        </div>
+
+        <div class="card">
+          <h2>Available Quizzes</h2>
+          <div id="quizzesList"></div>
+        </div>
+
+        <div class="card">
+          <h2>My Quiz Attempts</h2>
+          <div id="attemptsList" class="attempts-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function guard() {
+        const token = localStorage.getItem("token");
+        const role = localStorage.getItem("role");
+        if (!token || role !== "student") {
+          window.location.href = "login.html";
+        }
+      })();
+
+      const API_BASE = "http://localhost:5000";
+
+      function logout() {
+        localStorage.clear();
+        window.location.href = "login.html";
+      }
+
+      document.getElementById("welcomeName").textContent =
+        (localStorage.getItem("name") || "Student") + " \u00b7 student";
+
+      async function fetchJSON(url, options) {
+        const token = localStorage.getItem("token");
+        const res = await fetch(url, {
+          ...(options || {}),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            ...(options && options.headers)
+          }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = data && data.message ? data.message : "Request failed";
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      async function loadModules() {
+        try {
+          const modules = await fetchJSON(API_BASE + "/api/student/modules");
+          const container = document.getElementById("modulesList");
+          container.innerHTML = "";
+          if (!modules.length) {
+            container.textContent = "No modules available yet.";
+            return;
+          }
+          modules.forEach((m) => {
+            const div = document.createElement("div");
+            div.className = "item";
+            div.innerHTML =
+              '<div class="item-title">' +
+              m.title +
+              "</div>" +
+              '<div class="item-meta">By ' +
+              (m.createdBy && m.createdBy.name ? m.createdBy.name : "Teacher") +
+              "</div>" +
+              "<div>" +
+              (m.description || "") +
+              "</div>";
+            container.appendChild(div);
+          });
+        } catch (e) {
+          document.getElementById("modulesList").textContent =
+            "Error loading modules: " + e.message;
+        }
+      }
+
+      function renderQuizAttemptUI(quiz, container) {
+        const area = document.createElement("div");
+        area.className = "quiz-area";
+
+        const title = document.createElement("div");
+        title.className = "section-title";
+        title.textContent = "Attempt Quiz: " + quiz.title;
+        area.appendChild(title);
+
+        const questionsContainer = document.createElement("div");
+        quiz.questions.forEach((q, idx) => {
+          const qDiv = document.createElement("div");
+          qDiv.className = "question";
+
+          const qTitle = document.createElement("div");
+          qTitle.className = "question-title";
+          qTitle.textContent =
+            "Q" + (idx + 1) + " (" + (q.marks || 1) + " mark): " + q.questionText;
+          qDiv.appendChild(qTitle);
+
+          const optsDiv = document.createElement("div");
+          optsDiv.className = "question-options";
+
+          q.options.forEach((opt, optIdx) => {
+            const label = document.createElement("label");
+            const radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = "q_" + quiz._id + "_" + idx;
+            radio.value = String(optIdx);
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(" " + opt));
+            optsDiv.appendChild(label);
+          });
+
+          qDiv.appendChild(optsDiv);
+          questionsContainer.appendChild(qDiv);
+        });
+
+        area.appendChild(questionsContainer);
+
+        const submitBtn = document.createElement("button");
+        submitBtn.className = "btn-secondary";
+        submitBtn.textContent = "Submit Quiz";
+
+        const scoreMsg = document.createElement("div");
+        scoreMsg.className = "score-message";
+
+        submitBtn.addEventListener("click", async () => {
+          const answers = [];
+          quiz.questions.forEach((q, idx) => {
+            const selected = area.querySelector(
+              'input[name="q_' + quiz._id + "_" + idx + '"]:checked'
+            );
+            if (selected) {
+              answers.push({
+                questionIndex: idx,
+                selectedOptionIndex: Number(selected.value)
+              });
+            }
+          });
+
+          if (!answers.length) {
+            scoreMsg.textContent = "Please select at least one answer.";
+            return;
+          }
+
+          try {
+            const resp = await fetchJSON(
+              API_BASE + "/api/student/quizzes/" + quiz._id + "/attempt",
+              {
+                method: "POST",
+                body: JSON.stringify({ answers })
+              }
+            );
+            scoreMsg.textContent = "Your score: " + resp.score;
+            loadAttempts();
+          } catch (e) {
+            scoreMsg.textContent = "Error submitting quiz: " + e.message;
+          }
+        });
+
+        area.appendChild(submitBtn);
+        area.appendChild(scoreMsg);
+
+        container.appendChild(area);
+      }
+
+      async function loadQuizzes() {
+        try {
+          const quizzes = await fetchJSON(API_BASE + "/api/student/quizzes");
+          const container = document.getElementById("quizzesList");
+          container.innerHTML = "";
+          if (!quizzes.length) {
+            container.textContent = "No quizzes available yet.";
+            return;
+          }
+          quizzes.forEach((q) => {
+            const div = document.createElement("div");
+            div.className = "item";
+
+            const metaModule =
+              q.module && q.module.title ? "Module: " + q.module.title : "Standalone quiz";
+            const metaTeacher =
+              q.createdBy && q.createdBy.name ? "Teacher: " + q.createdBy.name : "";
+
+            div.innerHTML =
+              '<div class="item-title">' +
+              q.title +
+              "</div>" +
+              '<div class="item-meta">' +
+              metaModule +
+              (metaTeacher ? " \u00b7 " + metaTeacher : "") +
+              '</div>' +
+              '<div class="item-meta">Questions: ' +
+              (q.questions ? q.questions.length : 0) +
+              "</div>";
+
+            const btn = document.createElement("button");
+            btn.textContent = "Attempt Quiz";
+            btn.addEventListener("click", () => {
+              const existing = div.querySelector(".quiz-area");
+              if (existing) {
+                existing.remove();
+              } else {
+                renderQuizAttemptUI(q, div);
+              }
+            });
+
+            div.appendChild(btn);
+            container.appendChild(div);
+          });
+        } catch (e) {
+          document.getElementById("quizzesList").textContent =
+            "Error loading quizzes: " + e.message;
+        }
+      }
+
+      async function loadAttempts() {
+        try {
+          const attempts = await fetchJSON(API_BASE + "/api/student/attempts");
+          const container = document.getElementById("attemptsList");
+          container.innerHTML = "";
+          if (!attempts.length) {
+            container.textContent = "No attempts yet.";
+            return;
+          }
+          attempts.forEach((a) => {
+            const div = document.createElement("div");
+            div.className = "item";
+            const quizTitle = a.quiz && a.quiz.title ? a.quiz.title : "Quiz";
+            const date = new Date(a.createdAt).toLocaleString();
+            div.innerHTML =
+              "<div><strong>" +
+              quizTitle +
+              "</strong></div>" +
+              "<div>Score: " +
+              a.score +
+              "</div>" +
+              "<div>" +
+              date +
+              "</div>";
+            container.appendChild(div);
+          });
+        } catch (e) {
+          document.getElementById("attemptsList").textContent =
+            "Error loading attempts: " + e.message;
+        }
+      }
+
+      loadModules();
+      loadQuizzes();
+      loadAttempts();
+    </script>
+  </body>
+  </html>
+
+

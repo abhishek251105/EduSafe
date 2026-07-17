@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>EduSafe - Login</title>
+    <link rel="stylesheet" href="login.css" />
+  </head>
+  <body>
+    <div class="card">
+      <h1>EduSafe</h1>
+      <p class="subtitle">Preparedness &amp; Response Education Portal</p>
+
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@example.com" />
+
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Your password" />
+
+      <button id="loginBtn">Login</button>
+
+      <p id="error"></p>
+
+      <p class="info">
+        Use the API to register student / teacher / admin accounts, then log in
+        here.
+      </p>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:5000";
+
+      document.getElementById("loginBtn").addEventListener("click", async () => {
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const errorEl = document.getElementById("error");
+        errorEl.textContent = "";
+
+        if (!email || !password) {
+          errorEl.textContent = "Please enter both email and password.";
+          return;
+        }
+
+        try {
+          const res = await fetch(API_BASE + "/api/auth/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ email, password })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            errorEl.textContent = data.message || "Login failed.";
+            return;
+          }
+
+          const { token, user } = data;
+          if (!token || !user || !user.role) {
+            errorEl.textContent = "Invalid response from server.";
+            return;
+          }
+
+          localStorage.setItem("token", token);
+          localStorage.setItem("role", user.role);
+          localStorage.setItem("name", user.name || "");
+
+          if (user.role === "student") {
+            window.location.href = "student-dashboard.html";
+          } else if (user.role === "teacher") {
+            window.location.href = "teacher-dashboard.html";
+          } else if (user.role === "admin") {
+            window.location.href = "admin-dashboard.html";
+          } else {
+            errorEl.textContent = "Unknown role.";
+          }
+        } catch (err) {
+          console.error(err);
+          errorEl.textContent = "Network error while logging in.";
+        }
+      });
+    </script>
+  </body>
+  </html>
+
+
